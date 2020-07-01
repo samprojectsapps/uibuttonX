@@ -1,4 +1,4 @@
-# uibuttonX
+# UIButtonX
 An @IBDEsignable custom button with several easily customizable features.
 
 1. With Background property set to UIColor.clear, a two color gradient 
