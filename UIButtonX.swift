@@ -5,6 +5,7 @@ import UIKit
     1. With Background property set to UIColor.clear, a two color gradient background layer will show when button is unclicked, clicked or if isTempSelected. Gradient can be set horizontally, vertically or diagonally.
     2. A border feature with settable color and width. Border can have an independent circular shape on any of its 4 corners. The border's corner radius can exceed the height and width.
     3. With the UIButtonX's Line Break property set to Word Wrap, when the fixedWidth == true, the UIButtonX will adjust height to fit content, when the fixedWidth == false, the UIButtonX will adjust width to fit content
+    4. Change the Content Mode property to redraw. This will allow border to render on dimension changes.
  */
 @IBDesignable
 class UIButtonX: UIButton {
@@ -13,12 +14,16 @@ class UIButtonX: UIButton {
     @IBInspectable var secondColor : UIColor = UIColor.clear
     
     //Colors used in the UIButtonX gradient when pressed.
-    @IBInspectable var firstClickColor : UIColor = UIColor.clear
-    @IBInspectable var secondClickColor : UIColor = UIColor.clear
+    @IBInspectable var firstClickColor : UIColor = UIColor.white.withAlphaComponent(0.5)
+    @IBInspectable var secondClickColor : UIColor = UIColor.white.withAlphaComponent(0.5)
+    @IBInspectable var clickTextColor : UIColor = UIColor.darkGray
+    @IBInspectable var clickTintColor : UIColor = UIColor.darkGray
     
     //Colors used in the UIButtonX gradient when isTempSelected == true.
     @IBInspectable var firstSelectionColor : UIColor = UIColor.clear
     @IBInspectable var secondSelectionColor : UIColor = UIColor.clear
+    @IBInspectable var selectTextColor : UIColor = UIColor.white
+    @IBInspectable var selectTintColor : UIColor = UIColor.white
     
     //Indicates the start point for the gradient layer.
     @IBInspectable var x_StartPoint : Double = 1.0
@@ -31,13 +36,12 @@ class UIButtonX: UIButton {
     //Settable border color, width, and cornerRadius length
     @IBInspectable var borderColor : UIColor = UIColor.clear
     @IBInspectable var borderWidth : CGFloat = 2.0
-    @IBInspectable var cornerRadius : CGFloat  = 0.0
     
-    //Boolean indicating what corner to curve
-    @IBInspectable var topLeft: Bool = false
-    @IBInspectable var topRight: Bool = false
-    @IBInspectable var bottomRight: Bool = false
-    @IBInspectable var bottomLeft: Bool = false
+    @IBInspectable var cornerRadius : CGFloat  = 0.0
+    @IBInspectable var topLeftRadius : CGFloat  = -1
+    @IBInspectable var topRightRadius : CGFloat  = -1
+    @IBInspectable var bottomLeftRadius : CGFloat  = -1
+    @IBInspectable var bottomRightRadius : CGFloat  = -1
     
     override class var layerClass : AnyClass {
         get {
@@ -51,6 +55,7 @@ class UIButtonX: UIButton {
     
     //Variable to store the UIButtonX originat color
     var initialTextColor : UIColor?
+    var initialTintColor : UIColor?
     
     //UIButtonX pressed and needs to be redrawn to reflect any graphical changes.
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -79,25 +84,24 @@ class UIButtonX: UIButton {
      Returns s CGSize that contains all content within the UIButton including text and images.
      */
     override var intrinsicContentSize: CGSize {
-        let labelSize = titleLabel?.sizeThatFits(CGSize(width: fixedWidth ? frame.width : .greatestFiniteMagnitude, height: fixedWidth ? .greatestFiniteMagnitude : frame.height)) ?? .zero
         
         let wImage = image(for: [])?.size.width ?? 0
         let wTitleInset = titleEdgeInsets.left + titleEdgeInsets.right
         let wImageInset = imageEdgeInsets.left + imageEdgeInsets.right
         let wContentInset = contentEdgeInsets.left + contentEdgeInsets.right
-        let width : CGFloat = labelSize.width + wImage + wTitleInset + wImageInset + wContentInset
         
-        let biggerHeight = max(image(for: [])?.size.height ?? 0, labelSize.height)
         let hTitleInset = titleEdgeInsets.top + titleEdgeInsets.bottom
         let hImageInset = imageEdgeInsets.top + imageEdgeInsets.bottom
         let hContentInset = contentEdgeInsets.top + contentEdgeInsets.bottom
-        let height : CGFloat = biggerHeight + hTitleInset + hImageInset + hContentInset
-        
+
+        let labelSize = titleLabel?.sizeThatFits(CGSize(width: fixedWidth ? (frame.width - wImage - wTitleInset - wImageInset - wContentInset) : .greatestFiniteMagnitude, height: fixedWidth ? .greatestFiniteMagnitude : (frame.height - max(hTitleInset,hImageInset) - hContentInset))) ?? .zero
+            
+        let width : CGFloat = labelSize.width + wImage + wTitleInset + wImageInset + wContentInset
+        let height : CGFloat = labelSize.height + max(hTitleInset,hImageInset) + hContentInset
         let desiredButtonSize = CGSize(width: width, height: height)
         
         return desiredButtonSize
     }
-    
     /*
      overriden draw function adds the appropriate gradient layers, title color, corner radii, background color, border width and color
      */
@@ -112,26 +116,33 @@ class UIButtonX: UIButton {
         }
     
         if initialTextColor == nil {initialTextColor = titleColor(for: .normal)}
-        self.setTitleColor(isTempSelected ? UIColor.white : initialTextColor, for: .normal)
+        self.setTitleColor(isTempSelected ? selectTextColor : initialTextColor, for: .normal)
+        self.setTitleColor(clickTextColor, for: .highlighted)
+        
+        if initialTintColor == nil {initialTintColor = tintColor}
+        self.tintColor = pressed ? clickTintColor : isTempSelected ? selectTintColor : initialTintColor
         
         if let title = self.attributedTitle(for: .normal) {
             let newTitle = NSMutableAttributedString(attributedString: title)
-            newTitle.addAttribute(NSAttributedString.Key.foregroundColor, value: isTempSelected ? UIColor.white : initialTextColor!, range: (newTitle.string as NSString).range(of: newTitle.string))
+            newTitle.addAttribute(NSAttributedString.Key.foregroundColor, value: isTempSelected ? selectTextColor : initialTextColor!, range: (newTitle.string as NSString).range(of: newTitle.string))
             self.setAttributedTitle(newTitle, for: .normal)
         }
         
-        let topLeftRadius : CGFloat = cornerRadius, topRightRadius : CGFloat = cornerRadius, bottomLeftRadius : CGFloat = cornerRadius, bottomRightRadius : CGFloat = cornerRadius
+        if topLeftRadius < 0 {topLeftRadius = cornerRadius}
+        if topRightRadius < 0 {topRightRadius = cornerRadius}
+        if bottomLeftRadius < 0 {bottomLeftRadius = cornerRadius}
+        if bottomRightRadius < 0 {bottomRightRadius = cornerRadius}
         
         let path = UIBezierPath()
-        path.move(to: CGPoint(x: rect.origin.x + (topLeft ? topLeftRadius : 0), y: rect.origin.y))
-        path.addLine(to: CGPoint(x: rect.origin.x + rect.width - (topRight ? topRightRadius : 0), y: rect.origin.y))
-        if topRight { path.addArc(withCenter: CGPoint(x: rect.origin.x + rect.width - topRightRadius, y: rect.origin.y + topRightRadius), radius: topRightRadius, startAngle: -.pi/2, endAngle: 0, clockwise: true) }
-        path.addLine(to: CGPoint(x: rect.origin.x + rect.width, y: rect.origin.y + rect.height - (bottomRight ? bottomRightRadius : 0)))
-        if bottomRight { path.addArc(withCenter: CGPoint(x: rect.origin.x + rect.width - bottomRightRadius, y: rect.origin.y + rect.height - bottomRightRadius), radius: bottomRightRadius, startAngle: 0, endAngle: .pi/2, clockwise: true) }
-        path.addLine(to: CGPoint(x: rect.origin.x + (bottomLeft ? bottomLeftRadius : 0), y: rect.origin.y + rect.height))
-        if bottomLeft { path.addArc(withCenter: CGPoint(x: rect.origin.x + bottomLeftRadius, y: rect.origin.y + rect.height - bottomLeftRadius), radius: bottomLeftRadius, startAngle: .pi/2, endAngle: .pi , clockwise: true) }
-        path.addLine(to: CGPoint(x: rect.origin.x, y: rect.origin.y + (topLeft ? topLeftRadius : 0)))
-        if topLeft { path.addArc(withCenter: CGPoint(x: rect.origin.x + topLeftRadius, y: rect.origin.y + topLeftRadius), radius: topLeftRadius, startAngle: .pi, endAngle: -.pi/2 , clockwise: true) }
+        path.move(to: CGPoint(x: rect.origin.x + topLeftRadius, y: rect.origin.y))
+        path.addLine(to: CGPoint(x: rect.origin.x + rect.width - topRightRadius, y: rect.origin.y))
+        path.addArc(withCenter: CGPoint(x: rect.origin.x + rect.width - topRightRadius, y: rect.origin.y + topRightRadius), radius: topRightRadius, startAngle: -.pi/2, endAngle: 0, clockwise: true)
+        path.addLine(to: CGPoint(x: rect.origin.x + rect.width, y: rect.origin.y + rect.height - bottomRightRadius))
+        path.addArc(withCenter: CGPoint(x: rect.origin.x + rect.width - bottomRightRadius, y: rect.origin.y + rect.height - bottomRightRadius), radius: bottomRightRadius, startAngle: 0, endAngle: .pi/2, clockwise: true)
+        path.addLine(to: CGPoint(x: rect.origin.x + bottomLeftRadius, y: rect.origin.y + rect.height))
+        path.addArc(withCenter: CGPoint(x: rect.origin.x + bottomLeftRadius, y: rect.origin.y + rect.height - bottomLeftRadius), radius: bottomLeftRadius, startAngle: .pi/2, endAngle: .pi , clockwise: true)
+        path.addLine(to: CGPoint(x: rect.origin.x, y: rect.origin.y + topLeftRadius))
+        path.addArc(withCenter: CGPoint(x: rect.origin.x + topLeftRadius, y: rect.origin.y + topLeftRadius), radius: topLeftRadius, startAngle: .pi, endAngle: -.pi/2 , clockwise: true)
         
         let maskLayer = CAShapeLayer()
         maskLayer.frame = self.bounds
